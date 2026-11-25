@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Tools</title>
+<meta name="description" content="Free, browser-based security self-assessment tools. Test assets you own.">
+<style>
+:root {
+  --bg: #050605; --s1: #0b0e0c; --s2: #101411; --s3: #161b17;
+  --line: #1e2620; --line-2: #2a342c;
+  --text: #d7e3d9; --text-2: #8b998e; --text-3: #5d6a60;
+  --green: #39ff6a; --green-dim: #1f8f3f; --green-wash: rgba(57,255,106,.08);
+  --amber: #ffb224; --ease: cubic-bezier(.2,.7,.2,1);
+  --mono: "JetBrains Mono","Fira Code","IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin:0; min-height:100vh; background: var(--bg); color: var(--text);
+  font: 400 14px/1.55 var(--mono); -webkit-font-smoothing: antialiased; }
+body::after { content:""; position:fixed; inset:0; pointer-events:none; z-index:60;
+  background: repeating-linear-gradient(to bottom, rgba(57,255,106,.02) 0 1px, transparent 1px 3px); }
+:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.shell { max-width: 920px; margin: 0 auto; padding: 56px 24px 48px; display: grid; gap: 22px; }
+header { text-align:center; display:grid; gap:10px; justify-items:center; }
+.brand { display:flex; gap:12px; align-items:baseline; }
+.brand .mark { color: var(--green); font-size:22px; }
+h1 { margin:0; font-size:27px; font-weight:600; letter-spacing:-.01em; }
+.sub { margin:0; color: var(--text-2); font-size:13.5px; max-width:60ch; }
+.auth { display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
+  color: var(--green); font-size:12px; border:1px solid var(--green-dim); background: var(--green-wash);
+  border-radius:10px; padding:9px 16px; max-width:720px; margin:0 auto; text-align:center; }
+.auth svg { width:15px; height:15px; flex:none; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+@media (max-width:720px){ .grid { grid-template-columns:1fr; } }
+.card { display:flex; flex-direction:column; gap:12px; background: var(--s1);
+  border:1px solid var(--line); border-radius:14px; padding:22px; text-decoration:none; color:inherit;
+  transition: border-color 160ms var(--ease), transform 160ms var(--ease), background-color 160ms var(--ease); }
+.card:hover { border-color: var(--green-dim); background: linear-gradient(var(--green-wash),var(--green-wash)), var(--s1); }
+.card .top { display:flex; align-items:center; gap:12px; }
+.card .n { color: var(--text-3); font-size:12px; }
+.card h2 { margin:0; font-size:17px; font-weight:600; }
+.card p { margin:0; color: var(--text-2); font-size:12.5px; flex:1; }
+.tags { display:flex; gap:8px; flex-wrap:wrap; }
+.tag { font-size:10.5px; color: var(--text-2); border:1px solid var(--line-2); background: var(--s2);
+  border-radius:6px; padding:2px 8px; }
+.go { margin-top:2px; color: var(--green); font-size:13px; font-weight:600; }
+.note { background: var(--s1); border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+  color: var(--text-2); font-size:12.5px; }
+.note b { color: var(--green); }
+.foot { text-align:center; color: var(--text-3); font-size:11.5px; margin:0; display:grid; gap:4px; }
+.foot a { color: var(--text-2); }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div class="brand"><span class="mark" aria-hidden="true">▚</span><h1>Security Tools</h1></div>
+    <p class="sub">Free, browser-based self-assessment tools. Each one runs entirely in your own browser and checks an asset you control.</p>
+  </header>
+
+  <p class="auth" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>
+    For assessing assets you own or are authorised to test. Nothing you load is uploaded or stored.
+  </p>
+
+  <div class="grid">
+    <a class="card" href="firmware-secret-looter/">
+      <div class="top"><span class="n">01</span><h2>Firmware Secret Looter</h2></div>
+      <p>Drop in a firmware image or app binary and pull out hardcoded credentials — AWS/Google/Stripe keys, private keys, passwords, JWTs and high-entropy tokens — with every value masked.</p>
+      <div class="tags"><span class="tag">100% in-browser</span><span class="tag">no upload</span><span class="tag">no network</span></div>
+      <span class="go">Open tool →</span>
+    </a>
+    <a class="card" href="doppelganger/">
+      <div class="top"><span class="n">02</span><h2>Doppelganger</h2></div>
+      <p>Enter your domain to map the lookalike names an attacker would register to impersonate your brand — homoglyphs, typos and TLD swaps — and see which are live in DNS and can send email.</p>
+      <div class="tags"><span class="tag">in-browser</span><span class="tag">live DNS</span><span class="tag">real data only</span></div>
+      <span class="go">Open tool →</span>
+    </a>
+  </div>
+
+  <p class="note"><b>How these work.</b> Both tools run client-side: Firmware Secret Looter never makes a single network request, and Doppelganger's DNS checks run from your browser to a public resolver. Neither sends your files or your domain to any server of ours.</p>
+
+  <p class="foot">
+    <span>Runs in your browser · no account, no tracking.</span>
+    <span><a href="https://pro-tech-716.com">pro-tech-716.com</a></span>
+  </p>
+</main>
+</body>
+</html>

@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Browser-only: no network access at all (connect-src 'none'), the file never leaves this tab. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Firmware Secret Looter</title>
+<style>
+:root {
+  --bg: #060504;
+  --s1: #0d0b08;
+  --s2: #13100b;
+  --s3: #1b1710;
+  --line: #262016;
+  --line-2: #3a3020;
+  --text: #e8dcc6;
+  --text-2: #a39579;
+  --text-3: #6d6250;
+  --amber: #ffb224;
+  --amber-dim: #8a5d10;
+  --amber-wash: rgba(255, 178, 36, 0.08);
+  --red: #ff5a4a;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+  font: 400 14px/1.55 var(--mono); font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+body::after {               /* faint CRT scan-lines, static */
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255,190,90,.02) 0 1px, transparent 1px 3px);
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.shell { max-width: 1080px; margin: 0 auto; padding: 44px 24px 40px; display: grid; gap: 18px; }
+
+header { text-align: center; display: grid; gap: 8px; justify-items: center; }
+.brand { display: flex; gap: 12px; align-items: baseline; }
+.brand .addr { color: var(--amber); font-size: 13px; }
+h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+.sub { margin: 0; color: var(--text-2); font-size: 13px; max-width: 62ch; }
+
+/* drop zone */
+.drop {
+  display: grid; place-items: center; gap: 10px; text-align: center;
+  min-height: 170px; padding: 24px;
+  background: var(--s1); border: 1px dashed var(--line-2); border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease), background-color 160ms var(--ease);
+}
+.drop:hover, .drop.over { border-color: var(--amber); background: linear-gradient(var(--amber-wash), var(--amber-wash)), var(--s1); }
+.drop-icon { width: 28px; height: 28px; color: var(--amber); }
+.drop-title { font-size: 15px; font-weight: 600; }
+.drop-hint { color: var(--text-3); font-size: 12px; }
+.drop.loaded .drop-title { color: var(--amber); }
+
+.actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+button {
+  height: 44px; padding: 0 22px; border-radius: 8px; cursor: pointer;
+  font: 600 14px var(--mono);
+  transition: background-color 160ms var(--ease), opacity 160ms var(--ease), border-color 160ms var(--ease);
+}
+.primary { background: var(--amber); color: #170f00; border: 1px solid var(--amber-dim); }
+.primary:hover { background: #ffc552; }
+.ghost { background: var(--s2); color: var(--text-2); border: 1px solid var(--line-2); }
+.ghost:hover { border-color: var(--amber-dim); color: var(--text); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* readout */
+.readout {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+}
+.cell { background: var(--s1); padding: 14px 16px; display: grid; gap: 2px; min-width: 0; }
+.cell .k { color: var(--text-3); font-size: 11px; }
+.cell .v { font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell.total .v { font-size: 28px; line-height: 1.1; font-weight: 600; color: var(--amber); }
+body[data-state="hit"] .cell.total .v { color: var(--red); }
+.cell.wide { grid-column: span 2; }
+.bar { height: 3px; background: var(--s3); }
+.bar span { display: block; height: 100%; width: 0; background: var(--amber); transition: width 120ms linear; }
+.status { color: var(--text-2); font-size: 12px; text-align: center; min-height: 18px; }
+.status.err { color: var(--red); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip {
+  display: inline-flex; gap: 8px; align-items: center; height: 28px; padding: 0 10px;
+  border: 1px solid var(--line-2); border-radius: 7px; background: var(--s2);
+  color: var(--text-2); font-size: 12px;
+}
+.chip b { color: var(--amber); font-weight: 600; }
+button.chip { font: 400 12px var(--mono); cursor: pointer; }
+button.chip:hover { border-color: var(--amber-dim); color: var(--text); }
+button.chip[aria-pressed="true"] { border-color: var(--amber); color: var(--text); background: var(--s3); }
+
+/* hex strip */
+.hex {
+  background: #040302; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+  display: grid; gap: 8px; overflow: hidden;
+}
+.hex-head { display: flex; justify-content: space-between; color: var(--text-3); font-size: 11px; gap: 12px; }
+.hex-head span:last-child { color: var(--amber); }
+.hex pre {
+  margin: 0; font: 12px/1.6 var(--mono); color: var(--text-3); white-space: pre; overflow-x: auto;
+}
+.hex .o { color: var(--amber-dim); }
+.hex .m { color: var(--red); }
+.hex .p { color: var(--text-2); }
+
+/* results */
+.results { background: var(--s1); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.res-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 12px; }
+.res-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.res-head .count { color: var(--text-3); font-size: 12px; }
+.table-wrap { max-height: 460px; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { position: sticky; top: 0; background: var(--s2); color: var(--text-3); font-weight: 500; text-align: left; padding: 8px 16px; font-size: 11px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr { cursor: pointer; transition: background-color 120ms var(--ease); }
+tbody tr:hover, tbody tr[aria-selected="true"] { background: var(--s2); }
+tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
+.t-type { color: var(--amber); white-space: nowrap; }
+.t-type.crit { color: var(--red); }
+.t-off { color: var(--text-2); white-space: nowrap; }
+.t-enc { color: var(--text-3); white-space: nowrap; }
+.t-val { color: var(--text); overflow-wrap: anywhere; }
+.t-val .len { color: var(--text-3); margin-left: 8px; }
+.empty { padding: 28px 16px; text-align: center; color: var(--text-2); font-size: 13px; }
+.empty b { color: var(--amber); }
+.more { padding: 10px 16px; color: var(--text-3); font-size: 12px; border-top: 1px solid var(--line); }
+
+.defence { border-top: 1px solid var(--line); padding: 12px 16px; font-size: 12px; color: var(--text-2); }
+.defence span { color: var(--amber); margin-right: 6px; }
+.foot { text-align: center; color: var(--text-3); font-size: 11.5px; margin: 0; }
+
+.spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--s3); border-top-color: var(--amber); animation: spin 800ms linear infinite; vertical-align: -2px; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+tbody tr { animation: rise 200ms var(--ease) both; }
+
+@media (max-width: 820px) {
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cell.wide { grid-column: span 2; }
+  .cell.total { grid-column: span 2; }
+}
+@media (max-width: 560px) {
+  .shell { padding: 28px 16px; }
+  th:nth-child(3), td:nth-child(3) { display: none; }
+  td, th { padding-left: 10px; padding-right: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body data-state="idle">
+<main class="shell">
+  <header>
+    <div class="brand"><span class="addr" aria-hidden="true">0x00</span><h1>Firmware Secret Looter</h1></div>
+    <p class="sub">Pull hardcoded credentials out of your own firmware or app binary. Everything runs in this tab; the file is never uploaded.</p>
+  </header>
+
+  <label class="drop" id="drop" tabindex="0">
+    <input id="file" type="file" class="sr-only">
+    <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+    <span class="drop-title" id="drop-title">Drop a binary here, or choose a file</span>
+    <span class="drop-hint" id="drop-hint">.bin .img .elf .apk .ipa .exe .so .dll · any size your browser can hold</span>
+  </label>
+
+  <div class="actions">
+    <button class="primary" id="run" disabled>Run looter</button>
+    <button class="ghost" id="clear" disabled>Clear</button>
+  </div>
+
+  <section class="readout" aria-live="polite">
+    <div class="cell wide"><span class="k">File</span><span class="v" id="r-name">none</span></div>
+    <div class="cell"><span class="k">Size</span><span class="v" id="r-size">0 B</span></div>
+    <div class="cell"><span class="k">Strings ASCII / UTF-16</span><span class="v" id="r-str">0 / 0</span></div>
+    <div class="cell total"><span class="k">Secrets found</span><span class="v" id="r-total">0</span></div>
+    <div class="cell wide" style="grid-column: 1 / -1"><span class="k">SHA-256</span><span class="v" id="r-sha">-</span></div>
+  </section>
+  <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+  <p class="status" id="status">Choose a file to begin.</p>
+  <div class="chips" id="chips"></div>
+
+  <section class="hex" aria-label="Hex dump">
+    <div class="hex-head"><span id="hex-label">hex dump</span><span id="hex-off"></span></div>
+    <pre id="hex">no file loaded</pre>
+  </section>
+
+  <section class="results">
+    <div class="res-head"><h2>Hits</h2><span class="count" id="count">0 shown</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Type</th><th>Offset</th><th>Enc</th><th>Value (masked)</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty">Results appear here after a run.</div>
+    </div>
+    <div class="defence"><span>Defence</span> Never hardcode credentials in firmware: keep them in a secure element, or provision unique per-device secrets at manufacture.</div>
+  </section>
+
+  <p class="foot">No network access: this page's security policy blocks all requests. Values are masked to their first 4 characters, and matched bytes are hidden in the hex dump.</p>
+</main>
+
+<script>
+/* ===================================================================== core
+   Runs inside a Web Worker. Self-contained: it is turned into a Blob URL. */
+function looterCore() {
+  const MIN = 4;
+  const RULES = [
+    { type: "Private key", crit: true, re: /-----BEGIN ((?:[A-Z0-9]+ )*)PRIVATE KEY-----/g, label: (m) => "Private key" + (m[1] ? " (" + m[1].trim() + ")" : "") },
+    { type: "AWS access key", crit: true, re: /AKIA[0-9A-Z]{16}/g },
+    { type: "Google API key", crit: true, re: /AIza[0-9A-Za-z_\-]{35}/g },
+    { type: "Stripe live key", crit: true, re: /sk_live_[0-9A-Za-z]{8,}/g },
+    { type: "Stripe test key", re: /sk_test_[0-9A-Za-z]{8,}/g },
+    { type: "JWT", re: /eyJ[A-Za-z0-9_\-]{4,}\.eyJ[A-Za-z0-9_\-]{4,}\.[A-Za-z0-9_\-]{4,}/g },
+    { type: "Password", crit: true, re: /\b(?:password|passwd|pwd)\s*[=:]\s*["']?([^\s"'&;,]+)/gi, group: 1 },
+  ];
+  const TOKEN = /[A-Za-z0-9+\/=_\-]{17,}/g;
+
+  function entropy(s) {
+    const f = new Map();
+    for (const c of s) f.set(c, (f.get(c) || 0) + 1);
+    let h = 0;
+    for (const n of f.values()) { const p = n / s.length; h -= p * Math.log2(p); }
+    return h;
+  }
+  // lookup/alphabet tables (ABCDEF…, 0123…) are high-entropy but not secrets
+  function isSequence(s) {
+    let run = 1;
+    for (let i = 1; i < s.length; i++) {
+      run = s.charCodeAt(i) === s.charCodeAt(i - 1) + 1 ? run + 1 : 1;
+      if (run >= 6) return true;
+    }
+    return false;
+  }
+  // code identifiers / paths (X509_STORE_CTX_set_flags, lib/foo-bar) are made of
+  // word-like segments; random secrets are not
+  const WORDY = /^(?:[A-Za-z]?[a-z]+\d*|[A-Z0-9]+|[A-Z][a-z]+\d*|v?\d+)$/;
+  function isIdentifier(s) {
+    if (/^_Z|^\?\?|^__/.test(s)) return true;          // mangled C++ / compiler symbols
+    const seg = s.split(/[_\-\/.=+]+/).filter(Boolean);
+    if (seg.length >= 2 && seg.every((p) => WORDY.test(p))) return true;
+    // share of the string made of word-like runs (Signature, container, Insert…)
+    let words = 0;
+    for (const w of s.match(/[A-Z]?[a-z]{3,}/g) || []) if (/[aeiouy]/.test(w)) words += w.length;
+    return words / s.length >= 0.5;
+  }
+  const printable = (b) => (b >= 0x20 && b <= 0x7e) || b === 0x09 || b === 0x0a || b === 0x0d;
+
+  // yields { s, off, enc, w } for every ASCII and UTF-16LE string of >= MIN chars
+  function* strings(u8) {
+    const n = u8.length;
+    let i = 0;
+    while (i < n) {                                    // ASCII
+      if (!printable(u8[i])) { i++; continue; }
+      let j = i; while (j < n && printable(u8[j])) j++;
+      if (j - i >= MIN) yield { s: latin1(u8, i, j, 1), off: i, enc: "ascii", w: 1 };
+      i = j;
+    }
+    for (const start of [0, 1]) {                      // UTF-16LE at both alignments
+      i = start;
+      while (i + 1 < n) {
+        if (!(printable(u8[i]) && u8[i + 1] === 0)) { i += 2; continue; }
+        let j = i; while (j + 1 < n && printable(u8[j]) && u8[j + 1] === 0) j += 2;
+        if ((j - i) / 2 >= MIN) yield { s: latin1(u8, i, j, 2), off: i, enc: "utf16le", w: 2 };
+        i = j;
+      }
+    }
+  }
+  function latin1(u8, a, b, step) {
+    let out = "";
+    for (let k = a; k < b; k += step) out += String.fromCharCode(u8[k]);
+    return out;
+  }
+  function mask(v) { return v.slice(0, 4) + "•".repeat(Math.max(0, Math.min(v.length - 4, 12))); }
+
+  function scan(str) {
+    const hits = [];
+    const taken = [];
+    for (const r of RULES) {
+      r.re.lastIndex = 0;
+      let m;
+      while ((m = r.re.exec(str.s))) {
+        let val = m[0], at = m.index;
+        if (r.group) { val = m[r.group]; at = m.index + m[0].lastIndexOf(val); }
+        let type = r.label ? r.label(m) : r.type, crit = !!r.crit;
+        if (r.type === "Private key") {             // mask the key body, not the header
+          const rest = str.s.slice(m.index + m[0].length).replace(/^(?:[\s\r\n]+|[A-Za-z-]+: [^\n]*\n)+/, "");
+          const body = rest.match(/^[A-Za-z0-9+\/=]{16,}/);
+          if (body) val = body[0];
+          else { type = "Private key header (no body)"; crit = false; }   // e.g. a format constant in code
+        }
+        let endAt = m.index + m[0].length;
+        if (r.type === "Private key") {             // the whole PEM block is one hit
+          const e = str.s.indexOf("PRIVATE KEY-----", endAt);
+          endAt = e >= 0 ? e + 16 : str.s.length;
+        }
+        taken.push([m.index, endAt]);
+        hits.push({ type, crit, off: str.off + at * str.w,
+                    len: m[0].length * str.w, enc: str.enc, masked: mask(val), vlen: val.length });
+      }
+    }
+    TOKEN.lastIndex = 0;
+    let m;
+    while ((m = TOKEN.exec(str.s))) {
+      const a = m.index, b = a + m[0].length;
+      if (taken.some(([x, y]) => a < y && b > x)) continue;
+      const v = m[0];
+      if (v.length <= 16 || entropy(v) <= 4.0 || isSequence(v) || isIdentifier(v)) continue;
+      hits.push({ type: "High-entropy token", crit: false, off: str.off + a * str.w, len: v.length * str.w,
+                  enc: str.enc, masked: mask(v), vlen: v.length, h: +entropy(v).toFixed(2) });
+    }
+    return hits;
+  }
+
+  function run(u8, post) {
+    let nA = 0, nU = 0, batch = [], last = 0;
+    const total = u8.length * 3;                      // ascii pass + two utf16 passes
+    for (const str of strings(u8)) {
+      if (str.enc === "ascii") nA++; else nU++;
+      const h = scan(str);
+      if (h.length) batch.push(...h);
+      const pos = str.enc === "ascii" ? str.off : u8.length * (1 + (str.off & 1)) + str.off;
+      if (batch.length >= 50 || pos - last > 2_000_000) {
+        post({ kind: "progress", hits: batch, nA, nU, frac: Math.min(pos / total, 0.99) });
+        batch = []; last = pos;
+      }
+    }
+    post({ kind: "done", hits: batch, nA, nU });
+  }
+
+  if (typeof self !== "undefined" && typeof self.postMessage === "function" && typeof window === "undefined") {
+    self.onmessage = (e) => {
+      try { run(new Uint8Array(e.data), (m) => self.postMessage(m)); }
+      catch (err) { self.postMessage({ kind: "error", message: String(err && err.message || err) }); }
+    };
+  }
+  return { run, strings, scan, entropy };
+}
+
+/* ===================================================================== UI */
+const $ = (id) => document.getElementById(id);
+const drop = $("drop"), input = $("file"), runBtn = $("run"), clearBtn = $("clear");
+const rows = $("rows"), empty = $("empty");
+const MAX_ROWS = 2000;
+
+let file = null, bytes = null, hits = [], worker = null, selected = -1;
+
+function fmtBytes(n) {
+  const u = ["B", "KB", "MB", "GB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : n) + " " + u[i];
+}
+const hex = (n, w = 8) => "0x" + n.toString(16).padStart(w, "0");
+function setStatus(t, err = false, spin = false) {
+  const s = $("status");
+  s.className = "status" + (err ? " err" : "");
+  s.innerHTML = "";
+  if (spin) { const sp = document.createElement("span"); sp.className = "spin"; sp.setAttribute("aria-hidden", "true"); s.append(sp); }
+  s.append(t);
+}
+
+async function load(f) {
+  if (!f) return;
+  stop();
+  file = f;
+  hits = []; selected = -1;
+  drop.classList.add("loaded");
+  $("drop-title").textContent = f.name;
+  $("drop-hint").textContent = fmtBytes(f.size) + " · ready to run";
+  $("r-name").textContent = f.name; $("r-name").title = f.name;
+  $("r-size").textContent = fmtBytes(f.size);
+  $("r-str").textContent = "0 / 0"; $("r-total").textContent = "0"; $("r-sha").textContent = "hashing…";
+  $("bar").style.width = "0"; $("chips").innerHTML = ""; rows.innerHTML = "";
+  empty.hidden = false; empty.textContent = "Press Run looter to scan this file.";
+  $("count").textContent = "0 shown";
+  document.body.dataset.state = "loaded";
+  setStatus("Reading file…", false, true);
+  try {
+    const buf = await f.arrayBuffer();
+    bytes = new Uint8Array(buf);
+    drawHex(0, null);
+    runBtn.disabled = false; clearBtn.disabled = false;
+    setStatus("Loaded " + fmtBytes(f.size) + ". Ready to run.");
+    if (crypto.subtle) {
+      const d = await crypto.subtle.digest("SHA-256", buf);
+      $("r-sha").textContent = [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    } else $("r-sha").textContent = "unavailable in this context";
+  } catch (e) {
+    setStatus("Could not read the file: " + e.message, true);
+  }
+}
+
+function stop() { if (worker) { worker.terminate(); worker = null; } }
+
+function run() {
+  if (!bytes) return;
+  stop();
+  hits = []; selected = -1; rows.innerHTML = ""; $("chips").innerHTML = "";
+  $("r-total").textContent = "0"; empty.hidden = true;
+  document.body.dataset.state = "running";
+  runBtn.disabled = true;
+  setStatus("Extracting strings and matching secret patterns…", false, true);
+  const src = "(" + looterCore.toString() + ")();";
+  worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+  worker.onmessage = (e) => {
+    const m = e.data;
+    if (m.kind === "error") { setStatus("Scan failed: " + m.message, true); runBtn.disabled = false; stop(); return; }
+    if (m.hits && m.hits.length) addHits(m.hits);
+    $("r-str").textContent = m.nA.toLocaleString() + " / " + m.nU.toLocaleString();
+    if (m.kind === "progress") $("bar").style.width = Math.round(m.frac * 100) + "%";
+    if (m.kind === "done") finish(m);
+  };
+  worker.onerror = (e) => { setStatus("Scan failed: " + (e.message || "worker error"), true); runBtn.disabled = false; stop(); };
+  const copy = bytes.slice().buffer;                  // transfer a copy; keep ours for the hex strip
+  worker.postMessage(copy, [copy]);
+}
+
+let filter = null;
+function renderRows() {
+  rows.innerHTML = "";
+  rows.closest(".table-wrap").querySelectorAll(".more").forEach((d) => d.remove());
+  const idx = [];
+  hits.forEach((h, i) => { if (!filter || h.type === filter) idx.push(i); });
+  rows.append(rowsFor(idx.slice(0, MAX_ROWS)));
+  $("count").textContent = Math.min(idx.length, MAX_ROWS).toLocaleString() + " shown" + (filter ? " · " + filter : "");
+  if (idx.length > MAX_ROWS) {
+    const d = document.createElement("div"); d.className = "more";
+    d.textContent = `Showing the first ${MAX_ROWS.toLocaleString()} of ${idx.length.toLocaleString()} hits. Click a type above to narrow the list.`;
+    rows.closest(".table-wrap").append(d);
+  }
+  selected = -1;
+  if (idx.length) select(idx[0]); else drawHex(0, null);
+}
+
+function addHits(list) {
+  const start = hits.length;
+  hits.push(...list);
+  const idx = [];
+  for (let i = start; i < hits.length && i < MAX_ROWS; i++) idx.push(i);
+  rows.append(rowsFor(idx));
+  $("r-total").textContent = hits.length.toLocaleString();
+  $("count").textContent = Math.min(hits.length, MAX_ROWS).toLocaleString() + " shown";
+  if (hits.length) document.body.dataset.state = "hit";
+  if (selected < 0 && hits.length) select(0);
+}
+
+function rowsFor(idx) {
+  const frag = document.createDocumentFragment();
+  for (const i of idx) {
+    const h = hits[i];
+    const tr = document.createElement("tr");
+    tr.tabIndex = 0; tr.dataset.i = i; tr.setAttribute("aria-selected", "false");
+    const c = (cls, t) => { const td = document.createElement("td"); td.className = cls; td.textContent = t; return td; };
+    const val = c("t-val", h.masked);
+    const len = document.createElement("span"); len.className = "len";
+    len.textContent = h.vlen + " chars" + (h.h ? " · H " + h.h : "");
+    val.append(len);
+    tr.append(c("t-type" + (h.crit ? " crit" : ""), h.type), c("t-off", hex(h.off)), c("t-enc", h.enc === "ascii" ? "ascii" : "utf-16"), val);
+    frag.append(tr);
+  }
+  return frag;
+}
+
+function finish(m) {
+  stop();
+  $("bar").style.width = "100%";
+  runBtn.disabled = false;
+  hits.sort((a, b) => a.off - b.off);
+  const all = hits;
+  filter = null;
+  // per-type chips; critical types first. Click one to show only that type.
+  const by = {}, crit = {};
+  for (const h of all) { by[h.type] = (by[h.type] || 0) + 1; crit[h.type] = h.crit; }
+  const chips = $("chips"); chips.innerHTML = "";
+  Object.entries(by).sort((a, b) => (crit[b[0]] - crit[a[0]]) || (b[1] - a[1])).forEach(([t, n]) => {
+    const s = document.createElement("button"); s.className = "chip"; s.type = "button";
+    s.setAttribute("aria-pressed", "false"); s.title = "Show only " + t;
+    const b = document.createElement("b"); b.textContent = n.toLocaleString();
+    s.append(b, t);
+    s.addEventListener("click", () => {
+      filter = filter === t ? null : t;
+      chips.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === s && filter === t)));
+      renderRows();
+    });
+    chips.append(s);
+  });
+  renderRows();
+  if (!all.length) {
+    document.body.dataset.state = "clean";
+    empty.hidden = false;
+    empty.innerHTML = "";
+    const b = document.createElement("b"); b.textContent = "Clean. ";
+    empty.append(b, `No hardcoded secrets matched in ${(m.nA + m.nU).toLocaleString()} strings.`);
+    setStatus("Scan complete: nothing found.");
+  } else {
+    setStatus(`Scan complete: ${all.length.toLocaleString()} hit${all.length === 1 ? "" : "s"} in ${(m.nA + m.nU).toLocaleString()} strings.`);
+  }
+}
+
+function select(i) {
+  const prev = rows.querySelector('tr[aria-selected="true"]');
+  if (prev) prev.setAttribute("aria-selected", "false");
+  const tr = rows.querySelector(`tr[data-i="${i}"]`);
+  if (tr) tr.setAttribute("aria-selected", "true");
+  selected = i;
+  const h = hits[i];
+  drawHex(Math.max(0, (h.off & ~15) - 32), h);
+}
+
+// Hex strip: 6 rows around the selected hit. Bytes belonging to ANY hit are
+// shown as •• so the dump never reveals a secret the table masks.
+function drawHex(start, h) {
+  const pre = $("hex");
+  if (!bytes) { pre.textContent = "no file loaded"; return; }
+  const ROWS = 6, end = Math.min(bytes.length, start + ROWS * 16);
+  const covered = (k) => hits.some((x) => k >= x.off && k < x.off + x.len);
+  pre.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  const span = (cls, t) => { const s = document.createElement("span"); if (cls) s.className = cls; s.textContent = t; return s; };
+  for (let r = start; r < end; r += 16) {
+    frag.append(span("o", r.toString(16).padStart(8, "0")), "  ");
+    let asc = "";
+    for (let k = r; k < r + 16; k++) {
+      if (k >= end) { frag.append("   "); asc += " "; continue; }
+      if (covered(k)) { frag.append(span(h && k >= h.off && k < h.off + h.len ? "m" : "p", "••"), " "); asc += "•"; }
+      else {
+        const b = bytes[k];
+        frag.append(span(b ? "p" : "", b.toString(16).padStart(2, "0")), " ");
+        asc += b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : ".";
+      }
+      if (k === r + 7) frag.append(" ");
+    }
+    frag.append(" ", span("", asc), "\n");
+  }
+  pre.append(frag);
+  $("hex-label").textContent = h ? h.type : "file header";
+  $("hex-off").textContent = h ? hex(h.off) + " · " + h.len + " bytes masked" : hex(0);
+}
+
+function clearAll() {
+  stop(); file = null; bytes = null; hits = []; selected = -1; input.value = "";
+  drop.classList.remove("loaded");
+  $("drop-title").textContent = "Drop a binary here, or choose a file";
+  $("drop-hint").textContent = ".bin .img .elf .apk .ipa .exe .so .dll · any size your browser can hold";
+  ["r-name"].forEach((id) => ($(id).textContent = "none"));
+  $("r-size").textContent = "0 B"; $("r-str").textContent = "0 / 0"; $("r-total").textContent = "0"; $("r-sha").textContent = "-";
+  $("bar").style.width = "0"; $("chips").innerHTML = ""; rows.innerHTML = "";
+  empty.hidden = false; empty.textContent = "Results appear here after a run.";
+  $("count").textContent = "0 shown"; drawHex(0, null);
+  runBtn.disabled = true; clearBtn.disabled = true;
+  document.body.dataset.state = "idle"; setStatus("Choose a file to begin.");
+}
+
+input.addEventListener("change", () => load(input.files[0]));
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => load(e.dataTransfer.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());   // don't navigate to a file dropped off-target
+window.addEventListener("drop", (e) => e.preventDefault());
+runBtn.addEventListener("click", run);
+clearBtn.addEventListener("click", clearAll);
+rows.addEventListener("click", (e) => { const tr = e.target.closest("tr"); if (tr) select(+tr.dataset.i); });
+rows.addEventListener("keydown", (e) => {
+  const tr = e.target.closest("tr"); if (!tr) return;
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(+tr.dataset.i); }
+  if (e.key === "ArrowDown" && tr.nextElementSibling) { e.preventDefault(); tr.nextElementSibling.focus(); select(+tr.nextElementSibling.dataset.i); }
+  if (e.key === "ArrowUp" && tr.previousElementSibling) { e.preventDefault(); tr.previousElementSibling.focus(); select(+tr.previousElementSibling.dataset.i); }
+});
+</script>
+</body>
+</html>

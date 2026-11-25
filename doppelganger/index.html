@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Only the Google public DNS-over-HTTPS resolver may be contacted. Nothing else. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://dns.google; base-uri 'none'; form-action 'none'">
+<title>Doppelganger</title>
+<style>
+:root {
+  --bg: #050706;
+  --s1: #0a0f0c;
+  --s2: #0f1511;
+  --s3: #161e18;
+  --line: #1b261f;
+  --line-2: #2a382e;
+  --text: #d6e4da;
+  --text-2: #8aa093;
+  --text-3: #5c6f63;
+  --green: #35e08a;
+  --green-dim: #178b4f;
+  --radar: #1f7a4d;
+  --radar-line: rgba(53, 224, 138, .16);
+  --red: #ff4d4d;
+  --red-dim: #8f2222;
+  --red-wash: rgba(255, 77, 77, .10);
+  --amber: #ffb02e;
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --mono: "JetBrains Mono","Fira Code","IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+  font: 400 14px/1.55 var(--mono); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+}
+body::after { content:""; position:fixed; inset:0; pointer-events:none; z-index:60;
+  background: repeating-linear-gradient(to bottom, rgba(53,224,138,.02) 0 1px, transparent 1px 3px); }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+
+.shell { max-width: 1120px; margin: 0 auto; padding: 44px 24px 40px; display: grid; gap: 18px; }
+header { text-align:center; display:grid; gap:8px; justify-items:center; }
+.brand { display:flex; gap:12px; align-items:baseline; }
+.brand .dot { color: var(--green); }
+h1 { margin:0; font-size:24px; font-weight:600; letter-spacing:-.01em; }
+.sub { margin:0; color: var(--text-2); font-size:13px; max-width:64ch; }
+.auth { display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
+  color: var(--amber); font-size:12px; border:1px solid #4a3a12; background: rgba(255,176,46,.06);
+  border-radius:10px; padding:8px 14px; max-width:760px; margin:0 auto; text-align:center; }
+.auth svg { width:15px; height:15px; flex:none; }
+
+.target { display:grid; grid-template-columns:auto 1fr auto; align-items:center;
+  background: var(--s1); border:1px solid var(--line); border-radius:14px; padding:6px; max-width:760px; width:100%; margin:0 auto; }
+.target .pre { color: var(--text-3); padding:0 4px 0 12px; font-size:13px; }
+.target input { min-width:0; height:44px; background:transparent; border:0; color:var(--text); font:inherit; font-size:15px; padding:0 8px; }
+.target input::placeholder { color: var(--text-3); }
+.target input:focus { outline:none; }
+.target:focus-within { border-color: var(--line-2); }
+button { height:44px; padding:0 22px; border-radius:8px; cursor:pointer; font:600 14px var(--mono);
+  transition: background-color 160ms var(--ease), opacity 160ms var(--ease), border-color 160ms var(--ease); }
+.primary { background: var(--green); color:#04140b; border:1px solid var(--green-dim); }
+.primary:hover { background:#5bf0a5; }
+button:disabled { opacity:.45; cursor:progress; }
+.consent { grid-column:1/-1; display:flex; gap:10px; align-items:center; padding:10px 12px 6px;
+  color: var(--text-2); font-size:12px; cursor:pointer; border-top:1px solid var(--line); margin-top:6px; }
+.consent input { width:16px; height:16px; accent-color: var(--green); margin:0; }
+
+.readout { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.cell { background: var(--s1); padding:14px 16px; display:grid; gap:2px; min-width:0; }
+.cell .k { color: var(--text-3); font-size:11px; }
+.cell .v { font-size:22px; font-weight:600; color: var(--text); line-height:1.1; }
+.cell.red .v { color: var(--red); }
+.cell.mx .v { color: var(--amber); }
+.bar { height:3px; background: var(--s3); border-radius:2px; overflow:hidden; }
+.bar span { display:block; height:100%; width:0; background: var(--green); transition: width 120ms linear; }
+.status { text-align:center; color: var(--text-2); font-size:12px; min-height:18px; }
+.status.err { color: var(--red); }
+.spin { display:inline-block; width:12px; height:12px; border-radius:50%; border:2px solid var(--s3); border-top-color:var(--green); animation:spin 800ms linear infinite; vertical-align:-2px; margin-right:8px; }
+
+.grid { display:grid; grid-template-columns: 520px 1fr; gap:16px; align-items:start; }
+@media (max-width: 960px){ .grid { grid-template-columns:1fr; } }
+
+.radar-wrap { background: radial-gradient(circle at 50% 50%, #081210, #050706 70%);
+  border:1px solid var(--line); border-radius:16px; padding:10px; position:relative; }
+#radar { width:100%; height:auto; display:block; }
+.legend { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; padding:6px 0 2px; color:var(--text-2); font-size:11.5px; }
+.legend i { display:inline-block; width:9px; height:9px; border-radius:50%; vertical-align:0; margin-right:6px; }
+.legend .g { background:#45564c; } .legend .r { background: var(--red); } .legend .m { background: var(--red); box-shadow:0 0 0 2px rgba(255,77,77,.4); }
+
+.panel { background: var(--s1); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.panel h2 { margin:0; font-size:14px; font-weight:600; padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.panel h2 .c { color: var(--text-3); font-size:12px; font-weight:400; }
+.table-wrap { max-height:420px; overflow:auto; }
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+th { position:sticky; top:0; background:var(--s2); color:var(--text-3); font-weight:500; text-align:left; padding:8px 14px; font-size:11px; border-bottom:1px solid var(--line); }
+td { padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:middle; }
+tbody tr { animation: rise 200ms var(--ease) both; }
+.d-name { color: var(--text); overflow-wrap:anywhere; }
+.d-name.hit { color: var(--red); }
+.tag { font-size:10.5px; padding:1px 7px; border-radius:5px; white-space:nowrap; }
+.tag.reg { background: var(--red-wash); color: var(--red); border:1px solid var(--red-dim); }
+.tag.mx { background: rgba(255,176,46,.1); color: var(--amber); border:1px solid #6a4f16; }
+.tag.un { background: var(--s3); color: var(--text-3); border:1px solid var(--line-2); }
+.tech { color: var(--text-3); font-size:11px; }
+.mxh { color: var(--text-2); overflow-wrap:anywhere; }
+.empty { padding:26px 16px; text-align:center; color: var(--text-2); font-size:13px; }
+.empty b { color: var(--green); }
+.toggle { padding:9px 14px; border-top:1px solid var(--line); text-align:center; }
+.toggle button { height:auto; padding:6px 12px; font-size:12px; background:var(--s2); color:var(--text-2); border:1px solid var(--line-2); border-radius:7px; }
+
+.defence { background: var(--s1); border:1px solid var(--line); border-radius:14px; padding:16px; display:grid; gap:10px; }
+.defence h2 { margin:0; font-size:14px; }
+.defence ul { margin:0; padding-left:18px; color: var(--text-2); font-size:12.5px; display:grid; gap:6px; }
+.defence b { color: var(--green); font-weight:600; }
+.foot { text-align:center; color: var(--text-3); font-size:11.5px; margin:0; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { opacity:0; transform: translateY(3px); } to { opacity:1; transform:none; } }
+@keyframes sweep { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { r:4; opacity:1; } 50% { r:7.5; opacity:.55; } }
+#sweep { transform-origin:300px 300px; animation: sweep 4s linear infinite; }
+.dot.mx { animation: pulse 1.6s var(--ease) infinite; }
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{ animation:none!important; transition:none!important; } #sweep{ display:none; } }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div class="brand"><span class="dot" aria-hidden="true">◎</span><h1>Doppelganger</h1></div>
+    <p class="sub">Map the lookalike domains an attacker would use to impersonate your brand, and check which are live in DNS right now.</p>
+  </header>
+
+  <p class="auth" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>
+    Authorized impersonation-surface recon for a brand you own. Only scan your own domain. Lookups use public DNS and register nothing.
+  </p>
+
+  <form id="form" class="target" autocomplete="off">
+    <span class="pre" aria-hidden="true">brand://</span>
+    <label class="sr-only" for="domain">Your domain</label>
+    <input id="domain" name="domain" type="text" inputmode="url" spellcheck="false" placeholder="your-brand.com" required>
+    <button class="primary" id="go" type="submit">Scan</button>
+    <label class="consent"><input id="own" type="checkbox" required><span>This is my own domain, or I'm authorised to assess it</span></label>
+  </form>
+
+  <section class="readout" aria-live="polite">
+    <div class="cell"><span class="k">Candidates</span><span class="v" id="r-total">0</span></div>
+    <div class="cell"><span class="k">Checked</span><span class="v" id="r-done">0</span></div>
+    <div class="cell red"><span class="k">Resolving in DNS</span><span class="v" id="r-reg">0</span></div>
+    <div class="cell mx"><span class="k">Can send email (MX)</span><span class="v" id="r-mx">0</span></div>
+  </section>
+  <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+  <p class="status" id="status">Enter a domain you own to begin.</p>
+
+  <div class="grid">
+    <div class="radar-wrap">
+      <svg id="radar" viewBox="0 0 600 600" role="img" aria-label="Radar of lookalike domains"></svg>
+      <div class="legend">
+        <span><i class="g"></i>doesn't resolve</span>
+        <span><i class="r"></i>resolves</span>
+        <span><i class="m"></i>resolves + email (MX)</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live lookalikes <span class="c" id="count">—</span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Domain</th><th>DNS</th><th>Email (MX)</th><th>Technique</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty">Results appear here after a scan.</div>
+      </div>
+      <div class="toggle" id="toggle" hidden><button type="button" id="showall">Show all candidates</button></div>
+    </div>
+  </div>
+
+  <section class="defence">
+    <h2>Defence</h2>
+    <ul>
+      <li><b>Register the closest variants yourself.</b> Buy the homoglyph and common-TLD lookalikes nearest your name (the red and pulsing dots first) so an attacker can't.</li>
+      <li><b>Watch Certificate Transparency logs.</b> Monitor crt.sh / CT feeds for new TLS certificates issued on lookalike names — a cert often appears days before a phishing site goes live.</li>
+      <li><b>Harden email and train staff.</b> Enforce SPF, DKIM and a strict DMARC policy, add external-sender banners, and teach staff to spot lookalike senders (rn vs m, 0 vs o, swapped TLDs). Unicode/IDN homoglyphs go further than the ASCII set shown here.</li>
+    </ul>
+  </section>
+
+  <p class="foot">No tracking and no registration. The only network calls are DNS-over-HTTPS queries to dns.google for the candidate names; your domain never leaves these DNS lookups.</p>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const CX = 300, CY = 300, MAXR = 258;
+const DOH = "https://dns.google/resolve";
+const CONC = 8, MAX_CANDIDATES = 320;
+
+const HOMO = { o:["0"], "0":["o"], l:["1","i"], "1":["l"], i:["1","l"], e:["3"], a:["4"], s:["5"], b:["6","8"], g:["9"], t:["7"], z:["2"] };
+const MULTI = [["rn","m"],["m","rn"],["vv","w"],["w","vv"],["cl","d"],["nn","m"]];
+const ADJ = { q:"wa", w:"qes", e:"wrd", r:"etf", t:"ryg", y:"tuh", u:"yij", i:"uok", o:"ipl", p:"ol",
+  a:"qsz", s:"awedxz", d:"serfcx", f:"drtgvc", g:"ftyhbv", h:"gyujnb", j:"huikmn", k:"jiolm", l:"kop",
+  z:"asx", x:"zsdc", c:"xdfv", v:"cfgb", b:"vghn", n:"bhjm", m:"njk" };
+const PRI = { homoglyph:0, "tld-swap":1, omission:2, transposition:3, replacement:4, duplication:5 };
+const BAND = { homoglyph:[.30,.50], "tld-swap":[.78,.97], omission:[.50,.64], transposition:[.60,.72], replacement:[.66,.80], duplication:[.72,.86] };
+
+function hostParts(raw) {
+  let s = String(raw || "").trim().toLowerCase();
+  s = s.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, "").replace(/[?#].*$/, "").replace(/:\d+$/, "");
+  if (!s || !s.includes(".")) throw new Error("Enter a domain like your-brand.com");
+  if (!/^[a-z0-9.-]+$/.test(s)) throw new Error("That doesn't look like a plain domain name");
+  const parts = s.split(".").filter(Boolean);
+  if (parts.length < 2) throw new Error("Enter a domain like your-brand.com");
+  return { sld: parts[parts.length - 2], tld: parts[parts.length - 1], host: parts.slice(-2).join(".") };
+}
+
+function candidates(sld, tld) {
+  const variants = new Map();                     // sldVariant -> technique (first wins)
+  const V = (s, tech) => { if (/^[a-z0-9-]+$/.test(s) && !s.startsWith("-") && !s.endsWith("-") && s.length && !variants.has(s)) variants.set(s, tech); };
+  for (let i = 0; i < sld.length; i++) { const c = sld[i]; if (HOMO[c]) for (const r of HOMO[c]) V(sld.slice(0,i)+r+sld.slice(i+1), "homoglyph"); }
+  for (const [a,b] of MULTI) { let k = sld.indexOf(a); while (k >= 0) { V(sld.slice(0,k)+b+sld.slice(k+a.length), "homoglyph"); k = sld.indexOf(a, k+1); } }
+  for (let i = 0; i < sld.length; i++) V(sld.slice(0,i)+sld.slice(i+1), "omission");
+  for (let i = 0; i < sld.length-1; i++) V(sld.slice(0,i)+sld[i+1]+sld[i]+sld.slice(i+2), "transposition");
+  for (let i = 0; i < sld.length; i++) { const adj = ADJ[sld[i]]; if (adj) for (const c of adj) V(sld.slice(0,i)+c+sld.slice(i+1), "replacement"); }
+  for (let i = 0; i < sld.length; i++) V(sld.slice(0,i)+sld[i]+sld.slice(i), "duplication");
+  variants.set(sld, "tld-swap");                  // original name, other TLDs
+
+  const tlds = [...new Set([tld, "com", "co", "net", "org", "io"])];
+  const out = [];
+  for (const [s, tech] of variants) for (const t of tlds) {
+    if (s === sld && t === tld) continue;         // the real domain itself
+    out.push({ domain: s + "." + t, sld: s, tld: t, technique: s === sld ? "tld-swap" : tech });
+  }
+  const seen = new Set();
+  const uniq = out.filter(c => !seen.has(c.domain) && seen.add(c.domain));
+  uniq.sort((a, b) => (PRI[a.technique] - PRI[b.technique]) || a.domain.localeCompare(b.domain));
+  return uniq.slice(0, MAX_CANDIDATES);
+}
+
+function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+function place(c) {
+  const ang = hash(c.domain) * Math.PI * 2;
+  const [lo, hi] = BAND[c.technique] || [.5, .9];
+  const r = (lo + (hi - lo) * hash(c.domain + "r")) * MAXR;
+  return { x: CX + r * Math.cos(ang), y: CY + r * Math.sin(ang) };
+}
+
+// ---------------- radar chrome
+function drawRadar() {
+  const r = $("radar"); r.innerHTML = "";
+  const add = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); r.append(e); return e; };
+  for (const f of [0.30, 0.50, 0.64, 0.80, 0.97]) add("circle", { cx: CX, cy: CY, r: f * MAXR, fill: "none", stroke: "var(--radar-line)" });
+  for (let a = 0; a < 360; a += 30) { const rad = a * Math.PI / 180; add("line", { x1: CX, y1: CY, x2: CX + MAXR * Math.cos(rad), y2: CY + MAXR * Math.sin(rad), stroke: "var(--radar-line)" }); }
+  const sweep = add("g", { id: "sweep" });
+  const grad = add("defs", {});
+  grad.innerHTML = `<radialGradient id="sw"><stop offset="0%" stop-color="rgba(53,224,138,.22)"/><stop offset="100%" stop-color="transparent"/></radialGradient>`;
+  const w = document.createElementNS(SVGNS, "path");
+  w.setAttribute("d", `M${CX} ${CY} L${CX+MAXR} ${CY} A${MAXR} ${MAXR} 0 0 1 ${CX+MAXR*Math.cos(-0.5)} ${CY+MAXR*Math.sin(-0.5)} Z`);
+  w.setAttribute("fill", "url(#sw)"); sweep.append(w);
+  const labels = [["homoglyph", .40], ["typo", .70], ["TLD swap", .92]];
+  for (const [t, f] of labels) add("text", { x: CX, y: CY - f * MAXR + 2, fill: "var(--text-3)", "font-size": 11, "text-anchor": "middle", "font-family": "var(--mono)" }).textContent = t;
+  add("circle", { cx: CX, cy: CY, r: 3, fill: "var(--green)" });
+  dotLayer = add("g", { id: "dots" });
+}
+let dotLayer = null;
+
+// ---------------- scan
+let state, running = false, candList = [], liveCount = 0, showAll = false;
+
+function reset(list) {
+  drawRadar();
+  state = { total: list.length, done: 0, reg: 0, mx: 0, err: 0 };
+  candList = list; liveCount = 0; showAll = false;
+  $("r-total").textContent = list.length; $("r-done").textContent = "0";
+  $("r-reg").textContent = "0"; $("r-mx").textContent = "0";
+  $("bar").style.width = "0"; $("rows").innerHTML = ""; $("count").textContent = "scanning…";
+  $("empty").hidden = true; $("toggle").hidden = true;
+  for (const c of list) {
+    const p = place(c);
+    const d = document.createElementNS(SVGNS, "circle");
+    d.setAttribute("cx", p.x); d.setAttribute("cy", p.y); d.setAttribute("r", 2.4);
+    d.setAttribute("fill", "#2a362e"); d.setAttribute("class", "dot");
+    d.dataset.domain = c.domain; dotLayer.append(d);
+    c.node = d;
+  }
+}
+
+async function lookup(name, type) {
+  const res = await fetch(`${DOH}?name=${encodeURIComponent(name)}&type=${type}`, { headers: { accept: "application/dns-json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+async function scanOne(c) {
+  try {
+    const a = await lookup(c.domain, "A");
+    const resolves = a.Status === 0 && Array.isArray(a.Answer) && a.Answer.some(x => x.type === 1 || x.type === 5);
+    const existsNoData = a.Status === 0 && !resolves;        // NOERROR/NODATA: name exists
+    if (!resolves && !existsNoData) { c.state = "un"; markDot(c, "un"); return; }
+    let mxHost = null;
+    const mx = await lookup(c.domain, "MX");
+    if (mx.Status === 0 && Array.isArray(mx.Answer)) {
+      const rec = mx.Answer.filter(x => x.type === 15).map(x => x.data).sort()[0];
+      if (rec) mxHost = rec.replace(/^\d+\s+/, "").replace(/\.$/, "");
+    }
+    c.state = mxHost ? "mx" : "reg"; c.mxHost = mxHost;
+    liveCount++;
+    state.reg++; $("r-reg").textContent = state.reg;
+    if (mxHost) { state.mx++; $("r-mx").textContent = state.mx; }
+    markDot(c, c.state);
+    renderRows();
+  } catch (e) {
+    c.state = "err"; state.err++; markDot(c, "err");
+  }
+}
+
+function markDot(c, kind) {
+  const d = c.node; if (!d) return;
+  if (kind === "mx") { d.setAttribute("fill", "var(--red)"); d.setAttribute("r", 4); d.setAttribute("class", "dot mx"); }
+  else if (kind === "reg") { d.setAttribute("fill", "var(--red)"); d.setAttribute("r", 4); }
+  else if (kind === "err") { d.setAttribute("fill", "#4a3a12"); d.setAttribute("r", 2.4); }
+  else { d.setAttribute("fill", "#2f3d34"); d.setAttribute("r", 2.2); }
+}
+
+const rank = (c) => (c.state === "mx" ? 0 : c.state === "reg" ? 1 : c.state === "err" ? 2 : 3);
+function renderRows() {
+  const rows = $("rows");
+  const list = candList
+    .filter(c => showAll ? true : (c.state === "mx" || c.state === "reg"))
+    .sort((a, b) => rank(a) - rank(b) || PRI[a.technique] - PRI[b.technique] || a.domain.localeCompare(b.domain));
+  rows.innerHTML = "";
+  for (const c of list) {
+    const tr = document.createElement("tr");
+    const td = (h) => { const e = document.createElement("td"); e.innerHTML = h; return e; };
+    const live = c.state === "mx" || c.state === "reg";
+    const dns = live ? `<span class="tag reg">resolves</span>`
+      : c.state === "err" ? `<span class="tech">lookup failed</span>`
+      : `<span class="tag un">no</span>`;
+    const mxc = c.state === "mx" ? `<span class="tag mx">MX</span> <span class="mxh">${esc(c.mxHost)}</span>`
+      : live ? `<span class="tech">none</span>` : `<span class="tech">—</span>`;
+    tr.append(td(`<span class="d-name${live ? " hit" : ""}">${esc(c.domain)}</span>`), td(dns), td(mxc), td(`<span class="tech">${c.technique}</span>`));
+    rows.append(tr);
+  }
+  $("count").textContent = `${liveCount} live`;
+}
+const esc = (s) => s.replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+
+async function run(list) {
+  reset(list);
+  running = true; $("go").disabled = true;
+  setStatus("Querying public DNS for each lookalike…", false, true);
+  let i = 0;
+  const worker = async () => {
+    while (i < list.length && running) {
+      const c = list[i++];
+      await scanOne(c);
+      state.done++; $("r-done").textContent = state.done;
+      $("bar").style.width = Math.round(state.done / state.total * 100) + "%";
+    }
+  };
+  await Promise.all(Array.from({ length: CONC }, worker));
+  finish();
+}
+
+function finish() {
+  running = false; $("go").disabled = false; $("bar").style.width = "100%";
+  if (state.err && state.reg === 0 && state.done === state.err) {
+    setStatus("Could not reach dns.google — check your connection, then scan again.", true);
+    $("empty").hidden = false; $("empty").textContent = "No DNS results: the resolver could not be reached.";
+    $("count").textContent = "—"; return;
+  }
+  const errNote = state.err ? ` · ${state.err} lookup error${state.err === 1 ? "" : "s"}` : "";
+  if (liveCount === 0) {
+    $("empty").hidden = false;
+    $("empty").innerHTML = `<b>Clean.</b> None of the ${state.total} lookalikes resolve in DNS right now.`;
+    $("count").textContent = "0 live";
+    setStatus(`Scan complete · ${state.total} candidates checked · nothing registered${errNote}.`);
+  } else {
+    setStatus(`Scan complete · ${liveCount} of ${state.total} lookalikes resolve, ${state.mx} can send email${errNote}.`);
+    $("toggle").hidden = false;
+    $("showall").textContent = showAll ? "Show only live lookalikes" : `Show all ${state.total} candidates in the list`;
+  }
+}
+
+function setStatus(t, err = false, spin = false) {
+  const s = $("status"); s.className = "status" + (err ? " err" : ""); s.innerHTML = "";
+  if (spin) { const sp = document.createElement("span"); sp.className = "spin"; sp.setAttribute("aria-hidden", "true"); s.append(sp); }
+  s.append(t);
+}
+
+$("form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (running) return;
+  if (!$("own").checked) { setStatus("Tick the box to confirm this is your own domain.", true); return; }
+  let parts;
+  try { parts = hostParts($("domain").value); }
+  catch (err) { setStatus(err.message, true); return; }
+  const list = candidates(parts.sld, parts.tld);
+  run(list);
+});
+
+$("showall").addEventListener("click", () => {
+  showAll = !showAll;
+  $("showall").textContent = showAll ? "Show only live lookalikes" : `Show all ${state.total} candidates in the list`;
+  renderRows();
+});
+
+drawRadar();
+</script>
+</body>
+</html>
