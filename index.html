@@ -50,6 +50,9 @@ h1 { margin:0; font-size:27px; font-weight:600; letter-spacing:-.01em; }
 .note b { color: var(--green); }
 .foot { text-align:center; color: var(--text-3); font-size:11.5px; margin:0; display:grid; gap:4px; }
 .foot a { color: var(--text-2); }
+.group { margin:8px 0 -6px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color: var(--text-3); font-weight:600; }
+.hint { color: var(--text-3); font-size:11.5px; margin:2px 0 0; text-align:center; }
+.hint code { color: var(--text-2); background: var(--s2); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
 </style>
 </head>
 <body>
@@ -64,6 +67,7 @@ h1 { margin:0; font-size:27px; font-weight:600; letter-spacing:-.01em; }
     For assessing assets you own or are authorised to test. Nothing you load is uploaded or stored.
   </p>
 
+  <p class="group">Free tests · run in your browser</p>
   <div class="grid">
     <a class="card" href="firmware-secret-looter/">
       <div class="top"><span class="n">01</span><h2>Firmware Secret Looter</h2></div>
@@ -79,10 +83,27 @@ h1 { margin:0; font-size:27px; font-weight:600; letter-spacing:-.01em; }
     </a>
   </div>
 
-  <p class="note"><b>How these work.</b> Both tools run client-side: Firmware Secret Looter never makes a single network request, and Doppelganger's DNS checks run from your browser to a public resolver. Neither sends your files or your domain to any server of ours.</p>
+  <p class="group">Advanced · run on your own machine</p>
+  <div class="grid">
+    <a class="card" href="https://github.com/AjpSh00t3r/attack-surface-scanner" target="_blank" rel="noopener">
+      <div class="top"><span class="n">03</span><h2>Attack Surface Scanner</h2></div>
+      <p>Scan your own domain for exposed admin panels, leaking logs and exposed private keys. Runs as a local server on your machine — nothing is hosted.</p>
+      <div class="tags"><span class="tag">self-hosted</span><span class="tag">Node ≥ 20</span><span class="tag">zero deps</span></div>
+      <span class="go">View on GitHub →</span>
+    </a>
+    <a class="card" href="https://github.com/AjpSh00t3r/bucket-buster" target="_blank" rel="noopener">
+      <div class="top"><span class="n">04</span><h2>Bucket Buster</h2></div>
+      <p>Find your own brand's publicly-exposed S3 / GCS buckets and see what's listable in them. Runs locally against names derived from your brand only.</p>
+      <div class="tags"><span class="tag">self-hosted</span><span class="tag">Node ≥ 20</span><span class="tag">zero deps</span></div>
+      <span class="go">View on GitHub →</span>
+    </a>
+  </div>
+  <p class="hint">Self-hosted tools: <code>git clone</code>, then <code>npm start</code> — they run entirely on your own machine.</p>
+
+  <p class="note"><b>How these work.</b> The two browser tools run fully client-side: Firmware Secret Looter never makes a single network request, and Doppelganger's DNS checks go from your own browser to a public resolver — neither sends your files or your domain to any server of ours. The two advanced tools scan server-side, so they're shipped as code you run on your own machine rather than hosted here.</p>
 
   <p class="foot">
-    <span>Runs in your browser · no account, no tracking.</span>
+    <span>No account, no tracking.</span>
     <span><a href="https://pro-tech-716.com">pro-tech-716.com</a></span>
   </p>
 </main>
